@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include <stdio.h>
+//#include "entry.h"
 
 static bool isRandInit = false;
 
@@ -33,6 +34,7 @@ char generateChar(unsigned int unrand) {
     return MIN_CHAR + (unrand % DIF_CHAR);
 }
 
+// TODO better call it populateString
 int generateString(char* buffer, const int length) {
     // int length = randLength(minLength, maxLength);
     unsigned int unrand = (unsigned int)randLength(1, DIF_CHAR);
@@ -45,8 +47,6 @@ int generateString(char* buffer, const int length) {
 }
 
 int compressString(char* buffer, const int length) {
-    buffer[0] = 'b';
-
     if (length <= 0)
         return length;
 
@@ -74,11 +74,11 @@ int compressString(char* buffer, const int length) {
     if (curSymbolCount > 1)
         buffer[index++] = curSymbolCount;
     buffer[index++] = curSymbol;
-    buffer[index++] = '\0';
+    // buffer[index++] = '\0';
     return index; // length of compressed string
 }
 
-int recollect(char* buffer, const long int length, RecollectElem* elements, const long int elementsCount) {
+int recollect(char* buffer, const long int length, Entry* elements, const long int elementsCount) {
     int idx = 0;
     if (idx + sizeof(elementsCount) > length) {
         printf("%d + %ld > %ld\n", idx, sizeof(elementsCount), length);
@@ -97,7 +97,7 @@ int recollect(char* buffer, const long int length, RecollectElem* elements, cons
             printf("%d + %ld > %ld\n", idx, elements[i].length, length);
             return -1;
         }
-        memcpy(buffer + idx, elements[i].buffer, elements[i].length);
+        memcpy(buffer + idx, elements[i].data, elements[i].length);
         idx += elements[i].length;
     }
     return 0;

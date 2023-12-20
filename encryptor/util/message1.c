@@ -37,40 +37,42 @@ static int mc1_encrypt(Message* message) {
     unsigned char kk = randLength(MIN_CHAR, MAX_CHAR);
     unsigned char ks = randLength(1, MIN_CHAR);
 
-    message->message[message->messageLength++] = k;
-    message->message[message->messageLength++] = s;
-    message->key[message->keyLength++] = kk;
-    message->key[message->keyLength++] = ks;
+    message->messageEntry->data[message->messageEntry->length++] = k;
+    message->messageEntry->data[message->messageEntry->length++] = s;
+    message->keyEntry->data[message->keyEntry->length++] = kk;
+    message->keyEntry->data[message->keyEntry->length++] = ks;
     kk *= k;
     ks *= s;
     k -= s;
     kk -= ks;
-    message->message[4] = ec1(76, k + s * 3); // 'L'
-    message->key[4] = ec1(76, kk + ks * 3);
-    message->message[message->messageLength++] = ec1(77, k += s); // 'M'
-    message->key[message->keyLength++] = ec1(77, kk += ks);
-    message->message[message->messageLength++] = ec1(78, k += s); k += s; message->messageLength++; // 'N'
-    message->key[message->keyLength++] = ec1(78, kk += ks); kk += ks; message->keyLength++;
-    message->message[message->messageLength++] = ec1('1', k += s);
-    message->key[message->keyLength++] = ec1('1', kk += ks); 
+    message->messageEntry->data[4] = ec1(76, k + s * 3); // 'L'
+    message->keyEntry->data[4] = ec1(76, kk + ks * 3);
+    message->messageEntry->data[message->messageEntry->length++] = ec1(77, k += s); // 'M'
+    message->keyEntry->data[message->keyEntry->length++] = ec1(77, kk += ks);
+    message->messageEntry->data[message->messageEntry->length++] = ec1(78, k += s); k += s; message->messageEntry->length++; // 'N'
+    message->keyEntry->data[message->keyEntry->length++] = ec1(78, kk += ks); kk += ks; message->keyEntry->length++;
+    message->messageEntry->data[message->messageEntry->length++] = ec1('1', k += s);
+    message->keyEntry->data[message->keyEntry->length++] = ec1('1', kk += ks); 
 
     for (int i = 0; i < message->entryCount; i++) {
-        int entryLength = strlen(message->entries[i]);
-        message->message[message->messageLength++] = (char)entryLength;
-        unsigned char key = mc1_crypt_params[i%8].key;
-        unsigned char step = mc1_crypt_params[i%8].step;
-        if (message->entries[i][0] >= 32) {
-            message->key[message->keyLength++] = (char)i; // special
+        Entry* entry = message->entries[i];
+        message->messageEntry->data[message->messageEntry->length++] = (char)entry->length; // TODO add k|kk xor
+        unsigned char cryptKey = mc1_crypt_params[i%8].key;
+        unsigned char cryptStep = mc1_crypt_params[i%8].step;
+        printf("i = %d; %s\n", i, entry->data); // TODO: REMOVE
+        if (entry->data[0] >= 32) {
+            printf("^^^^^^^^^^^^^\n"); // TODO: REMOVE
+            message->keyEntry->data[message->keyEntry->length++] = (char)i; // special
         }
-        for (int j = 0; j < entryLength; j++) {
-            message->message[message->messageLength++] = message->entries[i][j] ^ key;
-            key += step;
+        for (int j = 0; j < entry->length; j++) {
+            message->messageEntry->data[message->messageEntry->length++] = entry->data[j] ^ cryptKey;
+            cryptKey += cryptStep;
         }
     }
 
     int addKeyLength = randLength(3, 8);
-    generateString(message->key + message->keyLength, addKeyLength);
-    message->keyLength += addKeyLength;    
+    generateString(message->keyEntry->data + message->keyEntry->length, addKeyLength);
+    message->keyEntry->length += addKeyLength;    
 
     return 0;
 }
@@ -78,40 +80,43 @@ static int mc1_encrypt(Message* message) {
 static int mc1_decrypt(Message* message) {
     // entries[0] is encrypted message, entriesCount = length of entries[0]
     printf("decripting shijth\n"); //TODO: udalit
+    printf("in decrypt key = %s\n", message->keyEntry->data); //TODO: udalit
 
     // TODO add safety on Length
 
-    char* ent = message->entries[0];
-    char* key = message->key;
-    int entInd = 0;
+    Entry* encryptedEntry = message->entries[0];
+    int encryptedInd = 0;
     int keyInd = 0;
 
-    message->key[keyInd] = ent[entInd++] * message->key[keyInd]; keyInd++;
-    message->key[keyInd] = ent[entInd++] * message->key[keyInd]; keyInd++;
+    message->keyEntry->data[keyInd] = encryptedEntry->data[encryptedInd++] * message->keyEntry->data[keyInd]; keyInd++;
+    message->keyEntry->data[keyInd] = encryptedEntry->data[encryptedInd++] * message->keyEntry->data[keyInd]; keyInd++;
 
-    if (detectType(message->key) != 1)
+    if (detectType(message->keyEntry->data) != 1)
         return -1;
     keyInd += 4;
-    entInd += 4;
+    encryptedInd += 4;
     
-    int spec = message->key[keyInd++];
+    int spec = message->keyEntry->data[keyInd++];
+    printf("spec == %d\n", spec); // TODO: REMOVE
 
     for (int i = 0; i < spec; i++) {
-
-    }
-
-    int encr = 0;
-    while (encr != spec) {
-        entInd += spec;
+        // TODO add k|kk xor
+        unsigned char length = encryptedEntry->data[encryptedInd++];
+        encryptedInd += length;
+        printf("spec len %d == %d\n", i, length); //TODO : REMOVE
     }
     
-    message->messageLength = 0;
-    unsigned char key = mc1_crypt_params[spec%8].key;
-    unsigned char step = mc1_crypt_params[spec%8].step;
-    spec = ent[entInd++];
-    for (int j = 0; j < spec; j++) {
-        message->message[message->messageLength++] = ent[entInd++] ^ key;
-        key += step;
+    
+    message->messageEntry->length = 0;
+    int length = encryptedEntry->data[encryptedInd++];
+
+    printf("message1 decr length = %d\n", length); // TODO : REMOVE
+    
+    unsigned char cryptKey = mc1_crypt_params[spec%8].key;
+    unsigned char cryptStep = mc1_crypt_params[spec%8].step;
+    for (int i = 0; i < length; i++) {
+        message->messageEntry->data[message->messageEntry->length++] = encryptedEntry->data[encryptedInd++] ^ cryptKey;
+        cryptKey += cryptStep;
     }
 
     return 0;

@@ -42,7 +42,7 @@ def utility_processor():
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    print('in index')
+    print('in index') # TODO: REMOVE
     form = IndexForm()
     message = ''
     if form.validate_on_submit():
@@ -51,7 +51,7 @@ def index():
         result = encryptor.encrypt(message)
         (error, encryptedMessage, key) = result
         # sleep(10) todo remove
-        if len(error) != 0:
+        if error != '':
             return render_template('index.html', form=form, error_msg=error)
         messageId = None
         try:
@@ -71,21 +71,29 @@ def view():
     messageId = request.args.get('id')
     key = request.args.get('key')
     message = ''
-    if key is not None:
+    if form.messageId.data is None and messageId is not None:
+        form.messageId.data = messageId
+    if form.key.data is None and key is not None:
         form.key.data = key
-    if messageId is not None:
+    messageId = form.messageId.data
+    key = form.key.data
+
+    if messageId is not None and int(messageId) >= 0:
         form.messageId.data = messageId
         encryptedMessage = None
         try:
             encryptedMessage = db.getEncryptedMessageById(messageId)
+            form.message.data = encryptedMessage
         except Exception as ex:
             return render_template('view.html', form=form, error_msg=ex.args)
         if encryptedMessage is not None:
             message = encryptedMessage
             form.message.data = message
             (error, message) = encryptor.decrypt(encryptedMessage, key)
-            if len(error) != 0:
-                    return render_template('view.html', form=form, error_msg=error)
+            if error != '':
+                return render_template('view.html', form=form, error_msg=error)
+            form.message.data = message
+        
     if form.validate_on_submit():
         return redirect(url_for('view', id=messageId, key=key))
     return render_template('view.html', form=form, error_msg=request.args.get('error_msg', ''))

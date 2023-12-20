@@ -4,6 +4,8 @@
 #include <inttypes.h>
 #include <errno.h>
 
+#include "entry.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,14 +14,6 @@ extern "C" {
 #define errno_t int
 #endif
 
-typedef struct Entry Entry;
-
-typedef struct Entry {
-    char* data;
-    // -1
-    long int length;
-} Entry;
-
 typedef struct MessageController MessageController;
 
 typedef struct Message Message;
@@ -27,12 +21,10 @@ typedef struct Message Message;
 typedef struct Message {
     unsigned int messageType;
     const MessageController* controller;
-    unsigned int messageLength;
-    char* message;
-    unsigned int keyLength;
-    char* key;
+    Entry* messageEntry;
+    Entry* keyEntry;
     size_t entryCount;
-    char** entries;
+    Entry** entries;
 } Message;
 
 typedef struct MessageController {

@@ -3,6 +3,7 @@
 #include "util/crypt.h"
 #include "util/message.h"
 #include "util/detect.h"
+#include "util/entry.h"
 
 #include <malloc.h>
 #include <string.h>
@@ -25,7 +26,7 @@ int encrypt(Entry textEntry, char* outputBuffer, const long int outputBufferSize
     // [0:64] err [64:128] key [66:2048] [2048] \0
     // 
     printf("bufZise = %ld\n", outputBufferSize); // TODO: REMOVE
-    printf("text = %s\n", textEntry.data);
+    printf("text = %s\n", textEntry.data); // TODO: REMOVE
 
     char error[ERROR_SIZE] = {};
     char encrypted[ENCRYPTED_SIZE] = {};
@@ -35,39 +36,50 @@ int encrypt(Entry textEntry, char* outputBuffer, const long int outputBufferSize
     int type = randLength(1, MAX_CRYPT_TYPE + 1);
 
     Message* message = createMessage(type);
-    message->messageLength = 0;
-    message->message = encrypted;
-    message->keyLength = 0;
-    message->key = key;
+
+    Entry* messageEntry = (Entry*)malloc(sizeof(Entry));
+    messageEntry->data = encrypted;
+    messageEntry->length = 0;
+    message->messageEntry = messageEntry;
+    
+    Entry* keyEntry = (Entry*)malloc(sizeof(Entry));
+    keyEntry->data = key;
+    keyEntry->length = 0;
+    message->keyEntry = keyEntry;
 
     int precursorCount = randLength(3, 8);
     int postcursorCount = randLength(3, 8);
 
     int entryCount = precursorCount + 1 + postcursorCount;
-    char** entries = calloc(entryCount, sizeof(char*));
-
-    char **precursor; // TODO:
+    Entry** entries = (Entry**)calloc(entryCount, sizeof(Entry**));
 
     int i;
     for (i = 0; i < precursorCount; i++) {
+        entries[i] = malloc(sizeof(Entry));
         int length = randLength(3, 8);
-        entries[i] = malloc(length);
-        generateString(entries[i], length);
-        entries[i][0] = entries[i][1];
-        length = compressString(entries[i], length);
+        char* data = malloc(length);
+        generateString(data, length);
+        data[0] = data[1];
+        length = compressString(data, length);
+        entries[i]->length = length;
+        entries[i]->data = data;
     }
 
-    entries[i] = malloc(textEntry.length + 1);
-    memcpy(entries[i++], textEntry.data, textEntry.length);
+    entries[i] = malloc(sizeof(Entry));
+    entries[i]->length = textEntry.length;
+    entries[i]->data = malloc(textEntry.length);
+    memcpy(entries[i++]->data, textEntry.data, textEntry.length);
 
     // char postcursor[8][8] = {};
-    for (int j = i; j < postcursorCount + i; j++) {
+    for (; i < entryCount; i++) {
+        entries[i] = malloc(sizeof(Entry));
         int length = randLength(3, 8);
-        entries[j] = malloc(length);
-        generateString(entries[j], length);
-        entries[j][0] = entries[j][1];
-        length = compressString(entries[j], length);
-        // message->entries[j] = precursor[j];
+        char* data = malloc(length);
+        generateString(data, length);
+        data[0] = data[1];
+        length = compressString(data, length);
+        entries[i]->length = length;
+        entries[i]->data = data;
     }
 
     message->entryCount = entryCount;
@@ -75,25 +87,35 @@ int encrypt(Entry textEntry, char* outputBuffer, const long int outputBufferSize
 
     message->controller->encode(message);
 
-    RecollectElem elements[] = {
+    Entry elements[] = {
         { error, strlen(error) },
-        { message->message, message->messageLength },
-        { message->key, message->keyLength }
-    };
+        { message->messageEntry->data, message->messageEntry->length },
+        { message->keyEntry->data, message->keyEntry->length }
+    }; // TODO refactor to
     
-    if (recollect(outputBuffer, outputBufferSize, elements, 3) != 0) {
-        printf("Encrypting error\n");
-        deleteMessage(message);
-        for (i = 0; i < entryCount; i++)
+    if (recollect(outputBuffer, outputBufferSize, elements, 3) != 0) { // TODO give &elements
+        printf("Encrypting recollect error\n");
+        for (i = 0; i < entryCount; i++) {
+            free(entries[i]->data);
             free(entries[i]);
+        }
         free(entries);
+        free(keyEntry);
+        free(messageEntry);
+        deleteMessage(message);
         return -1;
     }
 
-    deleteMessage(message);
-    for (i = 0; i < entryCount; i++)
+    //printf("encryCount = %d\n", entryCount);
+    for (i = 0; i < entryCount; i++) {
+        //printf("i = %d\n", i);
+        free(entries[i]->data);
         free(entries[i]);
+    }
     free(entries);
+    free(keyEntry);
+    free(messageEntry);
+    deleteMessage(message);
 
     return 0;
 };
@@ -103,50 +125,56 @@ int decrypt(Entry encryptedTextEntry, Entry keyEntry, char* outputBuffer, const 
     // 
     char error[ERROR_SIZE] = {};
     char decrypted[DECRYPTED_SIZE] = {};
+    char key[KEY_SIZE] = {};
 
     int type = detectType(encryptedTextEntry.data);
 
     Message* message = createMessage(type);
 
-    char** entries = calloc(1, sizeof(char*));
-    entries[0] = malloc(encryptedTextEntry.length + 1);
-    memcpy(entries[0], encryptedTextEntry.data, encryptedTextEntry.length);
+    Entry* messageEntry = (Entry*)malloc(sizeof(Entry));
+    messageEntry->data = decrypted;
+    messageEntry->length = 0;
+    message->messageEntry = messageEntry;
 
-    char* messageKey = malloc(keyEntry.length + 1);
-    memcpy(messageKey, keyEntry.data, keyEntry.length);
+    Entry* messageKeyEntry = (Entry*)malloc(sizeof(Entry)); // TODO add free()
+    messageKeyEntry->data = keyEntry.data;
+    messageKeyEntry->length = keyEntry.length;
+    message->keyEntry = messageKeyEntry;
+    //message->keyEntry = &keyEntry; // TODO test if it works and if it is change in encrypt
+    
+
+    int entryCount = 1;
+    Entry** entries = (Entry**)calloc(entryCount, sizeof(Entry**));
+    
+    entries[0] = (Entry*)malloc(sizeof(Entry)); // TODO add free()
+    entries[0]->data = encryptedTextEntry.data;
+    entries[0]->length = encryptedTextEntry.length;
+    //entries[0] = &encryptedTextEntry; // TODO test if it works and if it is change in encrypt
 
     message->entries = entries;
-    message->key = messageKey;
 
     if (message->controller->decode(message) != 0) {
         strcpy(error, "Wrong key");
     }
 
-    RecollectElem elements[] = {
+    Entry elements[] = {
         { error, strlen(error) },
-        { message->message, message->messageLength }
+        { message->messageEntry->data, message->messageEntry->length }
     };
 
-    printf("in decr outsizebuf = %ld\n", outputBufferSize);
+    printf("in decr outsizebuf = %ld\n", outputBufferSize); 
     
-    int result;
-    #pragma omp critical
-    {
-    result = recollect(outputBuffer, outputBufferSize, &elements, 2); 
-    }
-
-    if (result != 0) {
-        // deleteMessage(message);
-        // free(entries[0]);
-        // free(entries);
-        // free(messageKey);
+    if (recollect(outputBuffer, outputBufferSize, elements, 2) != 0) {
+        printf("Decrypting recollect error\n");
+        free(entries);
+        free(messageEntry);
+        deleteMessage(message);
         return -1;
     }
 
-    // deleteMessage(message);
-    // free(entries[0]);
-    // free(entries);
-    // free(messageKey);
+    free(entries);
+    free(messageEntry);
+    deleteMessage(message);
 
     return 0;
 };

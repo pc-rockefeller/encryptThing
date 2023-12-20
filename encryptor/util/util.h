@@ -1,5 +1,7 @@
 #pragma once
 
+#include "entry.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -12,20 +14,13 @@ void initRand();
 
 int randLength(const int min, const int max);
 
-typedef struct RecollectElem RecollectElem;
-
-typedef struct RecollectElem {
-    char* buffer;
-    const long int length;
-} RecollectElem;
-
 char generateChar();
 
 int generateString(char* buffer, const int length);
 
 int compressString(char* buffer, const int length);
 
-int recollect(char* buffer, const long int length, RecollectElem* elements, const long int elementsCount);
+int recollect(char* buffer, const long int length, Entry* elements, const long int elementsCount);
 
 #ifdef __cplusplus
 }

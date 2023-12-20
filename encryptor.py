@@ -26,7 +26,7 @@ def _getLib() -> ctypes.CDLL:
     return _libSo
 
 def encrypt(message : str) -> tuple[str]:
-    print('pythino encripto') # TODO
+    print('pythino encripto') # TODO REMOVE
     global _encrypt
     if not _encrypt:
         _encrypt = _getLib().encrypt
@@ -49,19 +49,25 @@ def decrypt(encryptedMessage : str, key : str) -> tuple[str]:
     if not _decrypt:
         _decrypt = _getLib().decrypt
         _decrypt.argtypes = [Entry, Entry, ctypes.c_char_p, ctypes.c_long] # encryptedTextEntry, keyEntry, output, outputBuffer
-    encryptedMessageBytes = base64.b64decode(encryptedMessage)
-    encryptedMessageEntry = Entry(encryptedMessageBytes, len(encryptedMessageBytes))
-    keyBytes = base64.b64decode(key)
-    keyEntry = Entry(keyBytes, len(keyBytes))
+    try:
+        encryptedMessageBytes = base64.b64decode(encryptedMessage)
+        encryptedMessageEntry = Entry(encryptedMessageBytes, len(encryptedMessageBytes))
+        keyBytes = base64.b64decode(key)
+        keyEntry = Entry(keyBytes, len(keyBytes))
+    except:
+        return('Wrong key', '')
     print(encryptedMessageBytes, keyBytes) # TODO REMOVE
     outCharPtr = ctypes.create_string_buffer(BUFFER_SIZE)
     _decrypt(encryptedMessageEntry, keyEntry, outCharPtr, BUFFER_SIZE)
     out = util.parseRecollected(outCharPtr.raw)
+    print('python decrypt out =', out)
     if len(out) < 2:
         return ('error parsing parsing recollection, len(out) < 2', '')
-    error = out[0].decode('ascii')
-    decryptedMessage = base64.b64encode(out[1]).decode('ascii')
-    key = base64.b64encode(out[1]).decode('ascii')
+    try:
+        error = out[0].decode('ascii')
+        decryptedMessage = out[1].decode('ascii')
+    except Exception as ex:
+        return('Wrong key', '')
     return (error, decryptedMessage)
 
 
